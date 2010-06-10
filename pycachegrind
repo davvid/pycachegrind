@@ -111,7 +111,7 @@ def main(args):
     prof = cProfile.Profile()
     try:
         try:
-            prof = prof.run('execfile(%r)' % (sys.argv[0],))
+            prof = prof.run('run(%r)' % sys.argv[0])
         except SystemExit:
             pass
     finally:
@@ -119,5 +119,15 @@ def main(args):
         kg.output(file(options.outfile, 'w'))
 
     return 0
+
+
+def run(filename):
+    """Run 'filename' as a Python application"""
+    path = os.path.abspath(filename)
+    globals_dict = {'__name__': '__main__',
+                    '__file__': path}
+    execfile(path, globals_dict)
+
+
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
