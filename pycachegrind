@@ -1,7 +1,9 @@
+#!/usr/bin/env python
 # lsprofcalltree.py: lsprof output which is readable by kcachegrind
 # David Allouche
 # Jp Calderone & Itamar Shtull-Trauring
 # Johan Dahlin
+# David Aguilar
 
 import optparse
 import os
