@@ -96,7 +96,7 @@ def main(args):
 
     if not sys.argv[1:]:
         parser.print_usage()
-        sys.exit(2)
+        return 2
 
     options, args = parser.parse_args()
 
@@ -115,5 +115,6 @@ def main(args):
         kg = KCacheGrind(prof)
         kg.output(file(options.outfile, 'w'))
 
+    return 0
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
