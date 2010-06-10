@@ -14,6 +14,7 @@ try:
 except ImportError:
     raise SystemExit("This script requires cProfile from Python 2.5")
 
+
 def label(code):
     if isinstance(code, str):
         return ('~', 0, code)    # built-in functions ('~' sorts at the end)
@@ -90,11 +91,11 @@ class KCacheGrind(object):
         print >> out_file, '%d %d' % (lineno, totaltime)
 
 def main(args):
-    usage = "%s [-o output_file_path] scriptfile [arg] ..."
-    parser = optparse.OptionParser(usage=usage % sys.argv[0])
+    usage = '%prog [-o output_file_path] scriptfile [arg] ...'
+    parser = optparse.OptionParser(usage=usage)
     parser.allow_interspersed_args = False
-    parser.add_option('-o', '--outfile', dest="outfile",
-                      help="Save stats to <outfile>", default=None)
+    parser.add_option('-o', '--outfile', dest='outfile',
+                      help='Save stats to <outfile>', default=None)
 
     if not sys.argv[1:]:
         parser.print_usage()
