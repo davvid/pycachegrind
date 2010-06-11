@@ -11,6 +11,8 @@
 import optparse
 import os
 import sys
+import imp
+
 
 try:
     import cProfile
@@ -126,10 +128,23 @@ def main(args):
 
 def run(filename):
     """Run 'filename' as a Python application"""
+
+    # Use the descriptor for '.py' files i.e. ('.py', 'U', imp.PY_SOURCE)
+    suffix = None
+    suffixes = imp.get_suffixes()
+    for sfx in suffixes:
+        if sfx[0] == '.py':
+            suffix = sfx
+
+    if suffix is None:
+        raise AssertionError('The import module is missing data for ".py" files')
+
     path = os.path.abspath(filename)
-    globals_dict = {'__name__': '__main__',
-                    '__file__': path}
-    execfile(path, globals_dict)
+    fp = open(path, 'rb')
+    try:
+        imp.load_module('__main__', fp, path, suffix)
+    finally:
+        fp.close()
 
 
 if __name__ == '__main__':
