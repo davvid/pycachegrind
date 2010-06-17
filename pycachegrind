@@ -17,7 +17,12 @@ import imp
 try:
     import cProfile
 except ImportError:
-    raise SystemExit("This script requires cProfile from Python 2.5")
+    raise SystemExit('This script requires cProfile from Python 2.5')
+
+try:
+    import pstats
+except ImportError:
+    raise SystemExit('This script requires pstats from Python 2.5')
 
 
 def label(code):
@@ -28,9 +33,62 @@ def label(code):
                              code.co_filename,
                              code.co_firstlineno)
 
+class Code(object):
+    pass
+
+class Entry(object):
+    pass
+
+
+def pstats2entries(data):
+    """Helper to convert serialized pstats back to a list of raw entries
+
+    Converse opperation of cProfile.Profile.dump_stats()
+
+    """
+    entries = {}
+    allcallers = {}
+
+    # first pass over stats to build the list of entry instances
+    for code_info, call_info in data.stats.items():
+        # build a fake code object
+        code = Code()
+        code.co_filename, code.co_firstlineno, code.co_name = code_info
+
+        # build a fake entry object
+        cc, nc, tt, ct, callers = call_info
+        entry = Entry()
+        entry.code = code
+        entry.callcount = cc
+        entry.reccallcount = nc - cc
+        entry.inlinetime = tt
+        entry.totaltime = ct
+
+        # to be filled during the second pass over stats
+        entry.calls = list()
+
+        # collect the new entry
+        entries[code_info] = entry
+        allcallers[code_info] = callers.items()
+
+    # second pass of stats to plug callees into callers
+    for entry in entries.itervalues():
+        entry_label = cProfile.label(entry.code)
+        entry_callers = allcallers.get(entry_label, [])
+        for entry_caller, call_info in entry_callers:
+            entries[entry_caller].calls.append(entry)
+
+    return entries.values()
+
+
 class KCacheGrind(object):
-    def __init__(self, profiler):
-        self.data = profiler.getstats()
+    def __init__(self, profiler=None, filename=None):
+        if profiler:
+            self.data = profiler.getstats()
+
+        elif filename:
+            self.data = pstats2entries(pstats.Stats(filename))
+
         self.out_file = None
 
     def output(self, out_file):
@@ -101,27 +159,36 @@ def main(args):
     parser.allow_interspersed_args = False
     parser.add_option('-o', '--outfile', dest='outfile',
                       help='Save stats to <outfile>', default=None)
-
-    if not sys.argv[1:]:
-        parser.print_usage()
-        return 2
+    parser.add_option('-i', '--infile', dest='infile',
+                      help='Read stats from <infile>', default=None)
 
     options, args = parser.parse_args()
 
+    if not options.infile and not args:
+        parser.print_usage()
+        return 2
+
     if not options.outfile:
-        options.outfile = '%s.log' % os.path.basename(args[0])
+        if options.infile:
+            options.outfile = options.infile + '.log'
+        else:
+            options.outfile = '%s.log' % os.path.basename(args[0])
 
     sys.argv[:] = args
 
-    prof = cProfile.Profile()
-    try:
+    if options.infile:
+        kg = KCacheGrind(filename=options.infile)
+    else:
         try:
-            prof = prof.run('run(%r)' % sys.argv[0])
-        except SystemExit:
-            pass
-    finally:
-        kg = KCacheGrind(prof)
-        kg.output(file(options.outfile, 'w'))
+            profiler = cProfile.Profile()
+            try:
+                profiler = prof.run('run(%r)' % sys.argv[0])
+            except SystemExit:
+                pass
+        finally:
+            kg = KCacheGrind(profiler=profiler)
+
+    kg.output(file(options.outfile, 'w'))
 
     return 0
 
