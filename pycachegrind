@@ -154,7 +154,7 @@ class KCacheGrind(object):
         print >> out_file, '%d %d' % (lineno, totaltime)
 
 def main(args):
-    usage = '%prog [-o output_file_path] scriptfile [arg] ...'
+    usage = '%prog [-o <output_file_path>] (-i <input_file_path> | <scriptfile> [arg]*)'
     parser = optparse.OptionParser(usage=usage)
     parser.allow_interspersed_args = False
     parser.add_option('-o', '--outfile', dest='outfile',
