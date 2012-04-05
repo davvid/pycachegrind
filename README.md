@@ -8,15 +8,17 @@ readable by kcachegrind.
 
 USAGE
 =====
-Usage: pycachegrind [-o <output_file_path>]
-                    (-i <input_file_path> | <scriptfile> [arg]*)
 
-Options:
-  -h, --help            show this help message and exit
-  -o OUTFILE, --outfile=OUTFILE
-                        Save stats to <outfile>
-  -i INFILE, --infile=INFILE
-                        Read stats from <infile>
+    $ ./pycachegrind -h
+    Usage: pycachegrind [-o <output_file_path>]
+                        (-i <input_file_path> | <scriptfile> [arg]*)
+
+    Options:
+      -h, --help            show this help message and exit
+      -o OUTFILE, --outfile=OUTFILE
+                            Save stats to <outfile>
+      -i INFILE, --infile=INFILE
+                            Read stats from <infile>
 
 SEE ALSO
 ========
