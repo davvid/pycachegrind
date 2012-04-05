@@ -22,8 +22,5 @@ USAGE
 
 SEE ALSO
 ========
-cProfile:
-* http://docs.python.org/library/profile.html
-
-kcachegrind:
-* http://kcachegrind.sourceforge.net/
+* [cProfile](http://docs.python.org/library/profile.html)
+* [kcachegrind](http://kcachegrind.sourceforge.net/)
