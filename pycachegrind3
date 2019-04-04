@@ -1,0 +1,219 @@
+#!/usr/bin/env python3
+# pycachegrind: Visualize cProfile data with kcachegrind
+# Copyright (C) 2010, David Aguilar
+#
+# Adapated from:
+# lsprofcalltree.py: lsprof output which is readable by kcachegrind
+# David Allouche
+# Jp Calderone & Itamar Shtull-Trauring
+# Johan Dahlin
+
+import optparse
+import os
+import sys
+import imp
+
+
+try:
+    import cProfile
+except ImportError:
+    raise SystemExit('This script requires cProfile from Python 2.5')
+
+try:
+    import pstats
+except ImportError:
+    raise SystemExit('This script requires pstats from Python 2.5')
+
+
+def label(code):
+    if isinstance(code, str):
+        return ('~', 0, code)    # built-in functions ('~' sorts at the end)
+    else:
+        return '%s %s:%d' % (code.co_name,
+                             code.co_filename,
+                             code.co_firstlineno)
+
+class Code(object):
+    pass
+
+class Entry(object):
+    pass
+
+
+def pstats2entries(data):
+    """Helper to convert serialized pstats back to a list of raw entries
+
+    Converse opperation of cProfile.Profile.dump_stats()
+
+    """
+    entries = {}
+    allcallers = {}
+
+    # first pass over stats to build the list of entry instances
+    for code_info, call_info in list(data.stats.items()):
+        # build a fake code object
+        code = Code()
+        code.co_filename, code.co_firstlineno, code.co_name = code_info
+
+        # build a fake entry object
+        cc, nc, tt, ct, callers = call_info
+        entry = Entry()
+        entry.code = code
+        entry.callcount = cc
+        entry.reccallcount = nc - cc
+        entry.inlinetime = tt
+        entry.totaltime = ct
+
+        # to be filled during the second pass over stats
+        entry.calls = list()
+
+        # collect the new entry
+        entries[code_info] = entry
+        allcallers[code_info] = list(callers.items())
+
+    # second pass of stats to plug callees into callers
+    for entry in list(entries.values()):
+        entry_label = cProfile.label(entry.code)
+        entry_callers = allcallers.get(entry_label, [])
+        for entry_caller, call_info in entry_callers:
+            entries[entry_caller].calls.append(entry)
+
+    return list(entries.values())
+
+
+class KCacheGrind(object):
+    def __init__(self, profiler=None, filename=None):
+        if profiler:
+            self.data = profiler.getstats()
+
+        elif filename:
+            self.data = pstats2entries(pstats.Stats(filename))
+
+        self.out_file = None
+
+    def output(self, out_file):
+        self.out_file = out_file
+        print('events: Ticks', file=out_file)
+        self._print_summary()
+        for entry in self.data:
+            self._entry(entry)
+
+    def _print_summary(self):
+        max_cost = 0
+        for entry in self.data:
+            totaltime = int(entry.totaltime * 1000)
+            max_cost = max(max_cost, totaltime)
+        print('summary: %d' % (max_cost,), file=self.out_file)
+
+    def _entry(self, entry):
+        out_file = self.out_file
+
+        code = entry.code
+        #print >> out_file, 'ob=%s' % (code.co_filename,)
+        if isinstance(code, str):
+            print('fi=~', file=out_file)
+        else:
+            print('fi=%s' % (code.co_filename,), file=out_file)
+        print('fn=%s' % (label(code),), file=out_file)
+
+        inlinetime = int(entry.inlinetime * 1000)
+        if isinstance(code, str):
+            print('0 ', inlinetime, file=out_file)
+        else:
+            print('%d %d' % (code.co_firstlineno, inlinetime), file=out_file)
+
+        # recursive calls are counted in entry.calls
+        if entry.calls:
+            calls = entry.calls
+        else:
+            calls = []
+
+        if isinstance(code, str):
+            lineno = 0
+        else:
+            lineno = code.co_firstlineno
+
+        for subentry in calls:
+            self._subentry(lineno, subentry)
+        print(file=out_file)
+
+    def _subentry(self, lineno, subentry):
+        out_file = self.out_file
+        code = subentry.code
+        #print >> out_file, 'cob=%s' % (code.co_filename,)
+        print('cfn=%s' % (label(code),), file=out_file)
+        if isinstance(code, str):
+            print('cfi=~', file=out_file)
+            print('calls=%d 0' % (subentry.callcount,), file=out_file)
+        else:
+            print('cfi=%s' % (code.co_filename,), file=out_file)
+            print('calls=%d %d' % (
+                subentry.callcount, code.co_firstlineno), file=out_file)
+
+        totaltime = int(subentry.totaltime * 1000)
+        print('%d %d' % (lineno, totaltime), file=out_file)
+
+def main(args):
+    usage = '%prog [-o <output_file_path>] (-i <input_file_path> | <scriptfile> [arg]*)'
+    parser = optparse.OptionParser(usage=usage)
+    parser.allow_interspersed_args = False
+    parser.add_option('-o', '--outfile', dest='outfile',
+                      help='Save stats to <outfile>', default=None)
+    parser.add_option('-i', '--infile', dest='infile',
+                      help='Read stats from <infile>', default=None)
+
+    options, args = parser.parse_args()
+
+    if not options.infile and not args:
+        parser.print_usage()
+        return 2
+
+    if not options.outfile:
+        if options.infile:
+            options.outfile = options.infile + '.log'
+        else:
+            options.outfile = '%s.log' % os.path.basename(args[0])
+
+    sys.argv[:] = args
+
+    if options.infile:
+        kg = KCacheGrind(filename=options.infile)
+    else:
+        try:
+            profiler = cProfile.Profile()
+            try:
+                profiler = profiler.run('run(%r)' % sys.argv[0])
+            except SystemExit:
+                pass
+        finally:
+            kg = KCacheGrind(profiler=profiler)
+
+    with open(options.outfile, 'w') as out_file:
+        kg.output(out_file)
+
+    return 0
+
+
+def run(filename):
+    """Run 'filename' as a Python application"""
+
+    # Use the descriptor for '.py' files i.e. ('.py', 'U', imp.PY_SOURCE)
+    suffix = None
+    suffixes = imp.get_suffixes()
+    for sfx in suffixes:
+        if sfx[0] == '.py':
+            suffix = sfx
+
+    if suffix is None:
+        raise AssertionError('The import module is missing data for ".py" files')
+
+    path = os.path.abspath(filename)
+    fp = open(path, 'rb')
+    try:
+        imp.load_module('__main__', fp, path, suffix)
+    finally:
+        fp.close()
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
