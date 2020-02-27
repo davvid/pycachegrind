@@ -1,13 +1,10 @@
-======================================================
-pycachegrind: Visualize cProfile data with kcachegrind
-======================================================
+# pycachegrind: Visualize cProfile data with kcachegrind
 
 pycachegrind allows you to run arbitrary Python scripts
 using cProfile.  The cProfile data is converted to a form
 readable by kcachegrind.
 
-USAGE
-=====
+## Usage
 
     $ ./pycachegrind -h
     Usage: pycachegrind [-o <output_file_path>]
@@ -20,7 +17,7 @@ USAGE
       -i INFILE, --infile=INFILE
                             Read stats from <infile>
 
-SEE ALSO
-========
+## See Also
+
 * [cProfile](http://docs.python.org/library/profile.html)
 * [kcachegrind](http://kcachegrind.sourceforge.net/)
